@@ -35,8 +35,6 @@ class AgentProcess(object):
         return_, frames = self.act_episode()
         self.act_timer.pause()
 
-        print return_, frames
-
         self.wrapup_timer.start()
         self.wrapup_episode()
         self.wrapup_timer.pause()
