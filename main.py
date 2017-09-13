@@ -12,6 +12,7 @@ arg_parser.add_argument('--max_frames', type=int, default=5000000)
 arg_parser.add_argument('--num_repeat', type=int, default=4)
 arg_parser.add_argument('--force_overwrite', type=str2bool, default=False)
 arg_parser.add_argument('--headless', type=str2bool, default=False)
+arg_parser.add_argument('--checkpoint_episodes', type=int, default=-1)
 arg_parser.add_argument('env')
 arg_parser.add_argument('log_dir')
 
@@ -85,9 +86,6 @@ def write_arg_file():
 def get_run_file():
     return open(os.path.join(args.log_dir, 'run.csv'), 'w')
 
-def get_buff_files(n):
-    return data_files, label_files
-
 def write_buff_files(agent_process):
     def write_forest_to(forest, data_file, label_file):
         for i in range(forest.get_memory_size()):
@@ -136,6 +134,8 @@ if __name__ == '__main__':
             outputs = [episode, total_buffer_size, total_frame_count, stopwatch.time()]
             outputs.extend(ep_data)
             outputs.extend(buff_sizes)
+            if args.checkpoint_episodes > 0 and episode % args.checkpoint_episodes == 0:
+                write_buff_files(agent_process)
 
             run_file.write(','.join(map(str, outputs))+'\n')
             run_file.flush()
