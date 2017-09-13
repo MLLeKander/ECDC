@@ -86,15 +86,20 @@ def get_run_file():
     return open(os.path.join(args.log_dir, 'run.csv'), 'w')
 
 def get_buff_files(n):
-    data_files = [gzip.open(os.path.join(args.log_dir, 'data_%d.gz' % i), 'wb') for i in range(n)]
-    label_files = [gzip.open(os.path.join(args.log_dir, 'labels_%d.gz' % i), 'wb') for i in range(n)]
     return data_files, label_files
 
-def write_forest_to(forest, data_file, label_file):
-    for i in range(forest.size()):
-        if forest.is_active(i):
-            data_file.write(' '.join('%.3f'%dat for dat in forest.get_data(i)) + '\n')
-            label_file.write('%.3f\n'%forest.get_label(i))
+def write_buff_files(agent_process):
+    def write_forest_to(forest, data_file, label_file):
+        for i in range(forest.get_memory_size()):
+            if forest.is_active(i):
+                data_file.write(' '.join('%.3f'%dat for dat in forest.get_data(i)) + '\n')
+                label_file.write('%.3f\n'%forest.get_label(i))
+
+    for ndx, buf in enumerate(agent_process.agent.action_buffers):
+        data_fname = os.path.join(args.log_dir, 'data_%d.gz' % ndx)
+        label_fname = os.path.join(args.log_dir, 'labels_%d.gz' % ndx)
+        with gzip.open(data_fname, 'wb') as data_file, gzip.open(label_fname, 'wb') as label_file:
+            write_forest_to(buf.forest, data_file, label_file)
 
 if __name__ == '__main__':
     parse_args()
@@ -140,12 +145,7 @@ if __name__ == '__main__':
         traceback.print_exc()
     finally:
         run_file.close()
-        data_files, label_files = get_buff_files(agent_process.env.action_space.n)
-        buffers = agent_process.agent.action_buffers
-        for data_file, label_file, buf in zip(data_files, label_files, buffers):
-            write_forest_to(buf.forest, data_file, label_file)
-            data_file.close()
-            label_file.close()
+        write_buff_files(agent_process)
 
 #episode, return, totalBufferSize, totalFrameCount, walltime, epFrames, actTimer, wrapupTimer
 # per-buffer: size
