@@ -6,13 +6,13 @@ from localreg import LocalConstantReg, LocalLinearReg
 from vqtree import KForest
 from sklearn.random_projection import SparseRandomProjection, GaussianRandomProjection
 
-arg_parser.add_argument('--num_trees', type=int, default=4)
+arg_parser.add_argument('--num_trees', type=int, default=2)
 arg_parser.add_argument('--memory_size', type=int, default=500000)
 arg_parser.add_argument('--spill', type=float, default=0.1)
 arg_parser.add_argument('--eps', type=float, default=0.005)
 arg_parser.add_argument('--max_dims', type=int, default=64)
-arg_parser.add_argument('--k', type=int, default=16)
-arg_parser.add_argument('--regressor_type', choices=['constant','linear'], default='linear')
+arg_parser.add_argument('--k', type=int, default=11)
+arg_parser.add_argument('--regressor_type', choices=['kernel','linear'], default='kernel')
 arg_parser.add_argument('--dry_run', type=str2bool, default=False)
 
 class FlattenProjection(object):

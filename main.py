@@ -9,7 +9,7 @@ from EC_agent import EpisodicControlAgent
 
 arg_parser.add_argument('--max_episodes', type=int, default=1000000)
 arg_parser.add_argument('--max_frames', type=int, default=5000000)
-arg_parser.add_argument('--num_repeat', type=int, default=4)
+arg_parser.add_argument('--num_repeat', type=int, default=1)
 arg_parser.add_argument('--force_overwrite', type=str2bool, default=False)
 arg_parser.add_argument('--headless', type=str2bool, default=False)
 arg_parser.add_argument('--checkpoint_episodes', type=int, default=-1)
