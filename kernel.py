@@ -7,11 +7,15 @@ def constant(dist_sq): # 1
     return np.ones(dist_sq.shape)
 
 def triangle(dist_sq): # 1 - dist/max(dist)
+    if len(dist_sq) == 1:
+        return np.array([1])
     dist = np.sqrt(dist_sq)
     normalized = dist/np.max(dist)
     return 1 - normalized
 
 def tricube(dist_sq): # (1 - (dist/max(dist))^3)^3
+    if len(dist_sq) == 1:
+        return np.array([1])
     dist = np.sqrt(dist_sq)
     normalized = dist_sq/np.max(dist_sq)
     cubed = 1 - normalized*normalized*normalized
