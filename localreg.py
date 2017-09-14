@@ -3,7 +3,7 @@ from args import *
 import numpy as np
 from utils import PrettyDeque
 
-arg_parser.add_argument('--tree_consistency_iters', type=int, default=1)
+arg_parser.add_argument('--tree_consistency_iters', type=int, default=10)
 arg_parser.add_argument('--kernel', choices=kernels.keys(), default='constant')
 
 class LocalReg(object):

@@ -13,6 +13,7 @@ arg_parser.add_argument('--num_repeat', type=int, default=1)
 arg_parser.add_argument('--force_overwrite', type=str2bool, default=False)
 arg_parser.add_argument('--headless', type=str2bool, default=False)
 arg_parser.add_argument('--checkpoint_episodes', type=int, default=-1)
+arg_parser.add_argument('--seed', type=int, default=5)
 arg_parser.add_argument('env')
 arg_parser.add_argument('log_dir')
 
@@ -25,7 +26,7 @@ class AgentProcess(object):
         self.wrapup_timer = StopWatch()
 
         self.env = gym.make(env_name)
-        self.agent = EpisodicControlAgent(self.env.action_space, self.env.observation_space)
+        self.agent = EpisodicControlAgent(self.env.action_space, self.env.observation_space, seed=seed)
 
         np.random.seed(self.seed)
         self.env._seed(self.seed)
@@ -108,7 +109,7 @@ if __name__ == '__main__':
 
     env_name = args.env
 
-    agent_process = AgentProcess(env_name=env_name, seed=5, num_repeat=args.num_repeat)
+    agent_process = AgentProcess(env_name=env_name, seed=args.seed, num_repeat=args.num_repeat)
 
     ensure_log_dir()
     write_arg_file()

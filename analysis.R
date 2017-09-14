@@ -11,7 +11,7 @@ my.require('data.table')
 my.require('cowplot')
 
 
-dat = data.table(read.csv('test_pg/run.csv'))
+dat = data.table(read.csv('run.csv'))
 
 ggplot(data = dat, aes(x = totalFrameCount, y = return)) +
   background_grid(major = 'y', minor = "none") + geom_smooth()# + geom_point(alpha=0.1, size=0.1)

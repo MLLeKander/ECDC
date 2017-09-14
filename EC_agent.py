@@ -6,9 +6,15 @@ from localreg import LocalConstantReg, LocalLinearReg
 from vqtree import KForest
 from sklearn.random_projection import SparseRandomProjection, GaussianRandomProjection
 
-arg_parser.add_argument('--num_trees', type=int, default=2)
-arg_parser.add_argument('--memory_size', type=int, default=500000)
-arg_parser.add_argument('--spill', type=float, default=0.1)
+arg_parser.add_argument('--num_trees', type=int, default=1)
+arg_parser.add_argument('--memory_size', type=int, default=1000000)
+arg_parser.add_argument('--max_leaf_size', type=int, default=128)
+arg_parser.add_argument('--branch_factor', type=int, default=32)
+arg_parser.add_argument('--spill', type=float, default=-1)
+arg_parser.add_argument('--min_leaves', type=int, default=40)
+arg_parser.add_argument('--search_type', type=int, default=3)
+arg_parser.add_argument('--exact_eps', type=float, default=0.1)
+
 arg_parser.add_argument('--eps', type=float, default=0.005)
 arg_parser.add_argument('--max_dims', type=int, default=64)
 arg_parser.add_argument('--k', type=int, default=11)
@@ -58,7 +64,7 @@ def get_num_actions(action_space):
     return action_space.n
     
 class EpisodicControlAgent(object):
-    def __init__(self, action_space, observation_space, k=None, regressor_type=None, eps=None, max_dims=None):
+    def __init__(self, action_space, observation_space, k=None, regressor_type=None, eps=None, max_dims=None, seed=None):
         if k is None:
             k = args.k
         if regressor_type is None:
@@ -67,11 +73,15 @@ class EpisodicControlAgent(object):
             eps = args.eps
         if max_dims is None:
             max_dims = args.max_dims
+        if seed is None:
+            seed = 5
 
         self.obs_projection = get_projection(observation_space, max_dims)
         self.num_actions = get_num_actions(action_space)
 
-        forests = [KForest(dim=self.obs_projection.out_dims(), memory_size=args.memory_size, spill=args.spill, num_trees=args.num_trees) for _ in range(self.num_actions)]
+        forest_arg_names = ['memory_size', 'max_leaf_size', 'branch_factor', 'spill', 'num_trees', 'min_leaves', 'exact_eps', 'search_type']
+        forest_args = {name:vars(args)[name] for name in forest_arg_names}
+        forests = [KForest(dim=self.obs_projection.out_dims(), rand_seed=seed, remove_dups=True, **forest_args) for _ in range(self.num_actions)]
         reg_ctor = LocalConstantReg if args.regressor_type == 'constant' else LocalLinearReg
         self.action_buffers = [reg_ctor(k, forest) for forest in forests]
 
