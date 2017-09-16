@@ -136,7 +136,6 @@ if __name__ == '__main__':
     buffers, projection = make_buffers(env_name=env_name, seed=args.seed)
     agent_process = AgentProcess(env_name=env_name, buffers=buffers, projection=projection, seed=args.seed, num_repeat=args.num_repeat)
     eval_process = AgentProcess(env_name=env_name, buffers=buffers, projection=projection, seed=args.seed, num_repeat=args.num_repeat)
-    eval_process.agent.eps = 0
 
     ensure_log_dir()
     write_arg_file()
