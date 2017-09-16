@@ -23,7 +23,7 @@ def tricube(dist_sq): # (1 - (dist/max(dist))^3)^3
     return cubed*cubed*cubed
 
 kernels = {
-    'inv_sq': inv_sq,
+    'invSq': inv_sq,
     'constant': constant,
     'triangle': triangle,
     'tricube': tricube,
