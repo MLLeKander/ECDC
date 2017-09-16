@@ -3,44 +3,42 @@ import gym, gym_ple
 import numpy as np
 import os
 from args import *
-from utils import StopWatch
+from utils import StopWatch, timeF
 from Queue import Queue
-from EC_agent import EpisodicControlAgent
+from EC_agent import EpisodicControlAgent, make_buffers
 
 arg_parser.add_argument('--max_episodes', type=int, default=1000000)
 arg_parser.add_argument('--max_frames', type=int, default=5000000)
 arg_parser.add_argument('--num_repeat', type=int, default=1)
 arg_parser.add_argument('--force_overwrite', type=str2bool, default=False)
 arg_parser.add_argument('--headless', type=str2bool, default=False)
-arg_parser.add_argument('--checkpoint_episodes', type=int, default=-1)
+arg_parser.add_argument('--checkpoint_frame_spacing', type=int, default=-1)
+arg_parser.add_argument('--eval_frame_spacing', type=int, default=-1)
+arg_parser.add_argument('--eval_seeds', type=str2list(int), default=range(100,105))
 arg_parser.add_argument('--seed', type=int, default=5)
 arg_parser.add_argument('env')
 arg_parser.add_argument('log_dir')
 
 class AgentProcess(object):
-    def __init__(self, env_name, seed, num_repeat):
+    def __init__(self, env_name, buffers, projection, seed, num_repeat):
         self.seed = seed
         self.num_repeat = num_repeat
 
-        self.act_timer = StopWatch()
-        self.wrapup_timer = StopWatch()
+        self.frame_count = 0
 
         self.env = gym.make(env_name)
-        self.agent = EpisodicControlAgent(self.env.action_space, self.env.observation_space, seed=seed)
+        self.agent = EpisodicControlAgent(buffers, projection)
 
         np.random.seed(self.seed)
-        self.env._seed(self.seed)
+        self.env.seed(self.seed)
         random.seed(self.seed)
 
     def run_episode(self):
-        self.act_timer.start()
-        return_, frames = self.act_episode()
-        self.act_timer.pause()
+        act_time, (return_, frames) = timeF(self.act_episode)
+        wrapup_time, _ = timeF(self.wrapup_episode)
+        self.frame_count += frames
 
-        self.wrapup_timer.start()
-        self.wrapup_episode()
-        self.wrapup_timer.pause()
-        return return_, frames, self.act_timer.time(), self.wrapup_timer.time()
+        return return_, frames, self.frame_count, act_time, wrapup_time
 
     def act_episode(self):
         obs = self.env.reset()
@@ -84,69 +82,120 @@ def write_arg_file():
     arg_file.write(`vars(args)`)
     arg_file.close()
 
-def get_run_file():
-    return open(os.path.join(args.log_dir, 'run.csv'), 'w')
+def get_train_file():
+    return open(os.path.join(args.log_dir, 'train.csv'), 'w')
+
+def get_eval_file():
+    return open(os.path.join(args.log_dir, 'eval.csv'), 'w')
 
 def write_buff_files(agent_process):
-    def write_forest_to(forest, data_file, label_file):
+    def get_forest_data(forest):
+        datas, labels = [], []
         for i in range(forest.get_memory_size()):
             if forest.is_active(i):
-                data_file.write(' '.join('%.3f'%dat for dat in forest.get_data(i)) + '\n')
-                label_file.write('%.3f\n'%forest.get_label(i))
+                datas.append(forest.get_data(i))
+                labels.append(forest.get_label(i))
+        return datas, labels
 
+    all_data = {}
     for ndx, buf in enumerate(agent_process.agent.action_buffers):
-        data_fname = os.path.join(args.log_dir, 'data_%d.gz' % ndx)
-        label_fname = os.path.join(args.log_dir, 'labels_%d.gz' % ndx)
-        with gzip.open(data_fname, 'wb') as data_file, gzip.open(label_fname, 'wb') as label_file:
-            write_forest_to(buf.forest, data_file, label_file)
+        datas, labels = get_forest_data(buf.forest)
+        all_data['data_%d'%ndx] = datas
+        all_data['labels_%d'%ndx] = datas
+    fname = os.path.join(args.log_dir, 'data.npz')
+    np.savez_compressed(fname, **all_data)
+
+def log_init(log_file, buffers):
+    log_file.write('episode,totalBufferSize,totalFrameCount,walltime,return,epFrames,actTime,wrapupTime')
+    for i in range(len(buffers)):
+        log_file.write(',size%d'%i)
+    log_file.write('\n')
+    log_file.flush()
+
+def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_frame_count, act_time, wrapup_time):
+    buff_sizes = [buff.size() for buff in buffers]
+    total_buffer_size = sum(buff_sizes)
+
+    outputs = [episode_num, total_buffer_size, total_frame_count, time]
+    outputs.extend([return_, ep_frames, act_time, wrapup_time])
+    outputs.extend(buff_sizes)
+
+    log_file.write(','.join(map(str, outputs))+'\n')
+    log_file.flush()
 
 if __name__ == '__main__':
     parse_args()
     
     if args.headless:
         os.putenv('SDL_VIDEODRIVER', 'fbcon')
-        os.environ["SDL_VIDEODRIVER"] = "dummy"
+        os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
     env_name = args.env
 
-    agent_process = AgentProcess(env_name=env_name, seed=args.seed, num_repeat=args.num_repeat)
+    buffers, projection = make_buffers(env_name=env_name, seed=args.seed)
+    agent_process = AgentProcess(env_name=env_name, buffers=buffers, projection=projection, seed=args.seed, num_repeat=args.num_repeat)
+    eval_process = AgentProcess(env_name=env_name, buffers=buffers, projection=projection, seed=args.seed, num_repeat=args.num_repeat)
+    eval_process.agent.eps = 0
 
     ensure_log_dir()
     write_arg_file()
-    run_file = get_run_file()
+    train_file, eval_file = get_train_file(), get_eval_file()
 
-    run_file.write('episode,totalBufferSize,totalFrameCount,walltime,return,epFrames,actTime,wrapupTime')
-    for i in range(agent_process.env.action_space.n):
-        run_file.write(',size%d'%i)
-    run_file.write('\n')
+    log_init(train_file, buffers)
+    log_init(eval_file, buffers)
+
+    next_checkpoint, next_eval = args.checkpoint_frame_spacing, args.eval_frame_spacing
+    eval_num = 0
 
     stopwatch = StopWatch()
     stopwatch.start()
-
-    total_frame_count = 0
     try:
-        for episode in range(args.max_episodes):
-            ep_data = agent_process.run_episode()
+        for episode_num in range(args.max_episodes):
+            return_, ep_frames, total_frame_count, act_time, wrapup_time = agent_process.run_episode()
+            log_episode(train_file, buffers, episode_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time)
 
-            buff_sizes = [buff.size() for buff in agent_process.agent.action_buffers]
-            total_buffer_size = sum(buff_sizes)
-            total_frame_count += ep_data[1]
-
-            outputs = [episode, total_buffer_size, total_frame_count, stopwatch.time()]
-            outputs.extend(ep_data)
-            outputs.extend(buff_sizes)
-            if args.checkpoint_episodes > 0 and episode % args.checkpoint_episodes == 0:
-                write_buff_files(agent_process)
-
-            run_file.write(','.join(map(str, outputs))+'\n')
-            run_file.flush()
             if total_frame_count >= args.max_frames:
                 break
+
+            if args.checkpoint_frame_spacing > 0 and total_frame_count >= next_checkpoint:
+                stopwatch.pause()
+
+                write_buff_files(agent_process)
+                while next_checkpoint < total_frame_count:
+                    next_checkpoint += args.checkpoint_frame_spacing
+
+                stopwatch.start()
+
+            if args.eval_frame_spacing > 0 and total_frame_count >= next_eval:
+                stopwatch.pause()
+
+                eval_num += 1
+                for seed in args.eval_seeds:
+                    eval_process.env.seed(seed)
+                    act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+                    wrapup_time = 0
+                    log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time)
+                while next_eval < total_frame_count:
+                    next_eval += args.eval_frame_spacing
+
+                stopwatch.start()
     except:
         traceback.print_exc()
     finally:
-        run_file.close()
+        stopwatch.pause()
+
+        eval_num += 1
+        total_frame_count = agent_process.frame_count
+        for seed in args.eval_seeds:
+            eval_process.env.seed(seed)
+            act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+            wrapup_time = 0
+            log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time)
+
+        train_file.close()
+        eval_file.close()
+
         write_buff_files(agent_process)
 
-#episode, return, totalBufferSize, totalFrameCount, walltime, epFrames, actTimer, wrapupTimer
+#episodeNum, return, totalBufferSize, totalFrameCount, walltime, epFrames, actTimer, wrapupTimer
 # per-buffer: size

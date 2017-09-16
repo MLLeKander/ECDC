@@ -20,3 +20,11 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def str2list(ctor):
+    def f(arg):
+        try:
+            return map(ctor, arg.split(','))
+        except Exception, e:
+            raise argparse.ArgumentTypeError('Invalid element in list: %s'%e)
+    return f

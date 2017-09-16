@@ -12,7 +12,7 @@ class StopWatch(object):
         self.start_time = -1
 
     def pause(self):
-        self.stored = timer() - self.start_time
+        self.stored += timer() - self.start_time
         self.start_time = -1
 
     def start(self):
@@ -24,3 +24,10 @@ class StopWatch(object):
 
     def time(self):
         return self.stored + (0 if self.start_time == -1 else timer() - self.start_time)
+
+def timeF(f):
+    timer = StopWatch()
+    timer.start()
+    result = f()
+    timer.pause()
+    return timer.time(), result

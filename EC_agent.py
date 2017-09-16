@@ -45,46 +45,53 @@ class RandomProjection(object):
         # Ugly dimensionality stuff...
         return self.projection.transform(in_vec.reshape(1,-1)).ravel()
 
-def get_projection(observation_space, max_dims):
-    in_shape = observation_space.shape
-    if isinstance(observation_space, gym.spaces.Box):
-        if max_dims >= np.prod(in_shape):
+def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
+    def get_projection(observation_space, max_dims):
+        in_shape = observation_space.shape
+        if isinstance(observation_space, gym.spaces.Box):
+            if max_dims >= np.prod(in_shape):
+                projection = FlattenProjection(in_shape=in_shape)
+            else:
+                projection = RandomProjection(in_shape=in_shape, out_dims=max_dims)
+        elif isinstance(observation_space, gym.spaces.Discrete): #TODO: ?
             projection = FlattenProjection(in_shape=in_shape)
         else:
-            projection = RandomProjection(in_shape=in_shape, out_dims=max_dims)
-    elif isinstance(observation_space, gym.spaces.Discrete): #TODO: ?
-        projection = FlattenProjection(in_shape=in_shape)
-    else:
-        raise RuntimeError('invalid environment: obs space must be Box or Discrete')
-    return projection
+            raise RuntimeError('invalid environment: obs space must be Box or Discrete')
+        return projection
 
-def get_num_actions(action_space):
+    env = gym.make(env_name)
+    action_space, observation_space = env.action_space, env.observation_space
+
+    if k is None:
+        k = args.k
+    if regressor_type is None:
+        regressor_type = args.regressor_type
+    if max_dims is None:
+        max_dims = args.max_dims
+
+    obs_projection = get_projection(observation_space, max_dims)
+
     if not isinstance(action_space, gym.spaces.Discrete):
         raise RuntimeError('invalid environment: action space must be Discrete')
-    return action_space.n
+    num_actions = action_space.n
+
+    forest_arg_names = ['memory_size', 'max_leaf_size', 'branch_factor', 'spill', 'num_trees', 'min_leaves', 'exact_eps', 'search_type']
+    forest_args = {name:vars(args)[name] for name in forest_arg_names}
+    forests = [KForest(dim=obs_projection.out_dims(), rand_seed=seed, remove_dups=True, **forest_args) for _ in range(num_actions)]
+
+    env.close()
+
+    reg_ctor = LocalConstantReg if args.regressor_type == 'constant' else LocalLinearReg
+    return [reg_ctor(k, forest) for forest in forests], obs_projection
     
 class EpisodicControlAgent(object):
-    def __init__(self, action_space, observation_space, k=None, regressor_type=None, eps=None, max_dims=None, seed=None):
-        if k is None:
-            k = args.k
-        if regressor_type is None:
-            regressor_type = args.regressor_type
+    def __init__(self, action_buffers, obs_projection, eps=None):
         if eps is None:
             eps = args.eps
-        if max_dims is None:
-            max_dims = args.max_dims
-        if seed is None:
-            seed = 5
 
-        self.obs_projection = get_projection(observation_space, max_dims)
-        self.num_actions = get_num_actions(action_space)
-
-        forest_arg_names = ['memory_size', 'max_leaf_size', 'branch_factor', 'spill', 'num_trees', 'min_leaves', 'exact_eps', 'search_type']
-        forest_args = {name:vars(args)[name] for name in forest_arg_names}
-        forests = [KForest(dim=self.obs_projection.out_dims(), rand_seed=seed, remove_dups=True, **forest_args) for _ in range(self.num_actions)]
-        reg_ctor = LocalConstantReg if args.regressor_type == 'constant' else LocalLinearReg
-        self.action_buffers = [reg_ctor(k, forest) for forest in forests]
-
+        self.action_buffers = action_buffers
+        self.obs_projection = obs_projection
+        self.num_actions = len(action_buffers)
         self.eps = eps
 
     def init_episode(self, obs):
