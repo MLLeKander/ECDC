@@ -109,16 +109,17 @@ def log_init(log_file, buffers):
     log_file.write('episode,totalBufferSize,totalFrameCount,walltime,return,epFrames,actTime,wrapupTime')
     for i in range(len(buffers)):
         log_file.write(',size%d'%i)
-    log_file.write('\n')
+    log_file.write(',seed\n')
     log_file.flush()
 
-def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_frame_count, act_time, wrapup_time):
+def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_frame_count, act_time, wrapup_time, seed):
     buff_sizes = [buff.size() for buff in buffers]
     total_buffer_size = sum(buff_sizes)
 
     outputs = [episode_num, total_buffer_size, total_frame_count, time]
     outputs.extend([return_, ep_frames, act_time, wrapup_time])
     outputs.extend(buff_sizes)
+    outputs.append(seed)
 
     log_file.write(','.join(map(str, outputs))+'\n')
     log_file.flush()
@@ -152,7 +153,7 @@ if __name__ == '__main__':
     try:
         for episode_num in range(args.max_episodes):
             return_, ep_frames, total_frame_count, act_time, wrapup_time = agent_process.run_episode()
-            log_episode(train_file, buffers, episode_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time)
+            log_episode(train_file, buffers, episode_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, args.seed)
 
             if total_frame_count >= args.max_frames:
                 break
@@ -174,7 +175,7 @@ if __name__ == '__main__':
                     eval_process.env.seed(seed)
                     act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
                     wrapup_time = 0
-                    log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time)
+                    log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
                 while next_eval < total_frame_count:
                     next_eval += args.eval_frame_spacing
 
@@ -190,7 +191,7 @@ if __name__ == '__main__':
             eval_process.env.seed(seed)
             act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
             wrapup_time = 0
-            log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time)
+            log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
 
         train_file.close()
         eval_file.close()
