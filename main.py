@@ -15,6 +15,7 @@ arg_parser.add_argument('--headless', type=str2bool, default=False)
 arg_parser.add_argument('--checkpoint_frame_spacing', type=int, default=-1)
 arg_parser.add_argument('--eval_frame_spacing', type=int, default=-1)
 arg_parser.add_argument('--eval_seeds', type=str2list(int), default=range(100,105))
+arg_parser.add_argument('--multi_eval', type=str2bool, default=False)
 arg_parser.add_argument('--seed', type=int, default=5)
 arg_parser.add_argument('env')
 arg_parser.add_argument('log_dir')
@@ -177,13 +178,14 @@ if __name__ == '__main__':
                     act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
                     log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
 
-                    eval_process.env.seed(seed)
-                    old_eps = eval_process.agent.eps
-                    eval_process.agent.eps = -1
-                    act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
-                    log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, -seed)
+                    if args.multi_eval:
+                        eval_process.env.seed(seed)
+                        old_eps = eval_process.agent.eps
+                        eval_process.agent.eps = -1
+                        act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+                        log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, -seed)
 
-                    eval_process.agent.eps = old_eps
+                        eval_process.agent.eps = old_eps
                 while next_eval < total_frame_count:
                     next_eval += args.eval_frame_spacing
 
