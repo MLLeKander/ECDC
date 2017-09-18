@@ -171,10 +171,19 @@ if __name__ == '__main__':
 
                 eval_num += 1
                 for seed in args.eval_seeds:
+                    wrapup_time = 0
+
                     eval_process.env.seed(seed)
                     act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
-                    wrapup_time = 0
                     log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
+
+                    eval_process.env.seed(seed)
+                    old_eps = eval_process.agent.eps
+                    eval_process.agent.eps = -1
+                    act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+                    log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, -seed)
+
+                    eval_process.agent.eps = old_eps
                 while next_eval < total_frame_count:
                     next_eval += args.eval_frame_spacing
 
@@ -184,13 +193,13 @@ if __name__ == '__main__':
     finally:
         stopwatch.pause()
 
-        eval_num += 1
-        total_frame_count = agent_process.frame_count
-        for seed in args.eval_seeds:
-            eval_process.env.seed(seed)
-            act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
-            wrapup_time = 0
-            log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
+        #eval_num += 1
+        #total_frame_count = agent_process.frame_count
+        #for seed in args.eval_seeds:
+        #    eval_process.env.seed(seed)
+        #    act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+        #    wrapup_time = 0
+        #    log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
 
         train_file.close()
         eval_file.close()
