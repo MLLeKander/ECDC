@@ -1,6 +1,7 @@
 import gym
 import random
 import numpy as np
+import cv2
 from args import *
 from localreg import LocalConstantReg, LocalLinearReg
 from vqtree import KForest
@@ -14,6 +15,7 @@ arg_parser.add_argument('--spill', type=float, default=-1)
 arg_parser.add_argument('--min_leaves', type=int, default=40)
 arg_parser.add_argument('--search_type', type=int, default=3)
 arg_parser.add_argument('--exact_eps', type=float, default=0.1)
+
 arg_parser.add_argument('--project_gauss', type=str2bool, default=False)
 arg_parser.add_argument('--rescale_height', type=int, default=-1)
 arg_parser.add_argument('--rescale_width', type=int, default=-1)
@@ -64,7 +66,7 @@ class RescaleProjection(object):
         return self.rand_projection.out_dims()
 
     def __call__(self, in_vec):
-        rescaled = cv2.resize(image, (args.rescale_width, args.rescale_height), interpolation=cv2.INTER_LINEAR)
+        rescaled = cv2.resize(in_vec, (args.rescale_width, args.rescale_height), interpolation=cv2.INTER_LINEAR)
         return self.rand_projection(rescaled)
 
 def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
