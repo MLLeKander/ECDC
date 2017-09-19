@@ -103,7 +103,7 @@ def write_buff_files(agent_process):
     for ndx, buf in enumerate(agent_process.agent.action_buffers):
         datas, labels = get_forest_data(buf.forest)
         all_data['data_%d'%ndx] = datas
-        all_data['labels_%d'%ndx] = datas
+        all_data['labels_%d'%ndx] = labels
     fname = os.path.join(args.log_dir, 'data.npz')
     np.savez_compressed(fname, **all_data)
 
