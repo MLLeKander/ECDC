@@ -17,6 +17,7 @@ arg_parser.add_argument('--eval_frame_spacing', type=int, default=-1)
 arg_parser.add_argument('--eval_seeds', type=str2list(int), default=range(100,105))
 arg_parser.add_argument('--multi_eval', type=str2bool, default=False)
 arg_parser.add_argument('--seed', type=int, default=5)
+arg_parser.add_argument('--atari_greyscale','--atari_grayscale', type=str2bool, default=True)
 arg_parser.add_argument('env')
 arg_parser.add_argument('log_dir')
 
@@ -125,12 +126,28 @@ def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_
     log_file.write(','.join(map(str, outputs))+'\n')
     log_file.flush()
 
+#TODO: This is really ugly monkeypatching
+# A proper solution would be to properly subclass, but this gets the job done for now...
+def monkeypatch_atari_greyscale():
+    from gym.envs.atari import AtariEnv
+    AtariEnv._get_image = lambda self: self.ale.getScreenGrayscale().squeeze()
+    old_init = AtariEnv.__init__
+    def new_init(slf, *args, **kwargs):
+        old_init(slf, *args, **kwargs)
+        old_space = slf.observation_space
+        if len(old_space.shape) == 3:
+            slf.observation_space = gym.spaces.Box(low=old_space.low[:,:,0], high=old_space.high[:,:,0])
+    AtariEnv.__init__ = new_init
+
 if __name__ == '__main__':
     parse_args()
     
-    if args.headless:
+    if args.headless: # Fix for gym_ple, which likes to needlessly spawn windows on construction...
         os.putenv('SDL_VIDEODRIVER', 'fbcon')
         os.environ['SDL_VIDEODRIVER'] = 'dummy'
+
+    if args.atari_greyscale:
+        monkeypatch_atari_greyscale()
 
     env_name = args.env
 

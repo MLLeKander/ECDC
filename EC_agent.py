@@ -14,6 +14,7 @@ arg_parser.add_argument('--spill', type=float, default=-1)
 arg_parser.add_argument('--min_leaves', type=int, default=40)
 arg_parser.add_argument('--search_type', type=int, default=3)
 arg_parser.add_argument('--exact_eps', type=float, default=0.1)
+arg_parser.add_argument('--project_gauss', type=str2bool, default=False)
 
 arg_parser.add_argument('--eps', type=float, default=0.005)
 arg_parser.add_argument('--max_dims', type=int, default=64)
@@ -33,7 +34,10 @@ class FlattenProjection(object):
 
 class RandomProjection(object):
     def __init__(self, in_shape, out_dims):
-        self.projection = SparseRandomProjection(n_components=out_dims)
+        if args.project_gauss:
+            self.projection = GaussianRandomProjection(n_components=out_dims)
+        else:
+            self.projection = SparseRandomProjection(n_components=out_dims)
         num_dims = np.prod(in_shape)
         self.projection.fit([[1]*num_dims])
         self._out_dims = out_dims
@@ -103,8 +107,8 @@ class EpisodicControlAgent(object):
     def wrapup_episode(self):
         return_ = 0
         for action,reward,obs_pre in reversed(self.history):
-            self.action_buffers[action].add(obs_pre, return_)
             return_ += reward
+            self.action_buffers[action].add(obs_pre, return_)
 
     def choose_action(self, obs):
         if args.dry_run:
