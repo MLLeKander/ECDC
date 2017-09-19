@@ -130,7 +130,9 @@ def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_
 # A proper solution would be to properly subclass, but this gets the job done for now...
 def monkeypatch_atari_greyscale():
     from gym.envs.atari import AtariEnv
-    AtariEnv._get_image = lambda self: self.ale.getScreenGrayscale().squeeze()
+
+    AtariEnv._get_image = lambda slf: slf.ale.getScreenGrayscale().squeeze()
+
     old_init = AtariEnv.__init__
     def new_init(slf, *args, **kwargs):
         old_init(slf, *args, **kwargs)
@@ -138,6 +140,16 @@ def monkeypatch_atari_greyscale():
         if len(old_space.shape) == 3:
             slf.observation_space = gym.spaces.Box(low=old_space.low[:,:,0], high=old_space.high[:,:,0])
     AtariEnv.__init__ = new_init
+
+    old_render = AtariEnv._render
+    def new_render(slf, mode='human', close=False):
+        if close or mode != 'human':
+            old_render(slf, mode, close)
+        if slf.viewer is None:
+            from gym.envs.classic_control import rendering
+            slf.viewer = rendering.SimpleImageViewer()
+        slf.viewer.imshow(slf._get_image()[:,:,np.newaxis].repeat(3,axis=2))
+    AtariEnv._render = new_render
 
 if __name__ == '__main__':
     parse_args()

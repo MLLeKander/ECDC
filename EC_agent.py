@@ -15,6 +15,8 @@ arg_parser.add_argument('--min_leaves', type=int, default=40)
 arg_parser.add_argument('--search_type', type=int, default=3)
 arg_parser.add_argument('--exact_eps', type=float, default=0.1)
 arg_parser.add_argument('--project_gauss', type=str2bool, default=False)
+arg_parser.add_argument('--rescale_height', type=int, default=-1)
+arg_parser.add_argument('--rescale_width', type=int, default=-1)
 
 arg_parser.add_argument('--eps', type=float, default=0.005)
 arg_parser.add_argument('--max_dims', type=int, default=64)
@@ -49,6 +51,22 @@ class RandomProjection(object):
         # Ugly dimensionality stuff...
         return self.projection.transform(in_vec.reshape(1,-1)).ravel()
 
+class RescaleProjection(object):
+    def __init__(self, in_shape, out_dims):
+        rand_in_shape = list(in_shape) # Temporarily convert to list to modify
+        rand_in_shape[0] = args.rescale_width
+        rand_in_shape[1] = args.rescale_height
+        rand_in_shape = tuple(rand_in_shape)
+
+        self.rand_projection = RandomProjection(rand_in_shape, out_dims)
+
+    def out_dims(self):
+        return self.rand_projection.out_dims()
+
+    def __call__(self, in_vec):
+        rescaled = cv2.resize(image, (args.rescale_width, args.rescale_height), interpolation=cv2.INTER_LINEAR)
+        return self.rand_projection(rescaled)
+
 def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
     def get_projection(observation_space, max_dims):
         in_shape = observation_space.shape
@@ -56,7 +74,12 @@ def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
             if max_dims >= np.prod(in_shape):
                 projection = FlattenProjection(in_shape=in_shape)
             else:
-                projection = RandomProjection(in_shape=in_shape, out_dims=max_dims)
+                if (args.rescale_height <= 0) != (args.rescale_width <= 0):
+                    raise ValueError('Either both or neither of rescale_height and rescale_width must be specified')
+                elif args.rescale_height > 0:
+                    projection = RescaleProjection(in_shape=in_shape, out_dims=max_dims)
+                else:
+                    projection = RandomProjection(in_shape=in_shape, out_dims=max_dims)
         elif isinstance(observation_space, gym.spaces.Discrete): #TODO: ?
             projection = FlattenProjection(in_shape=in_shape)
         else:
