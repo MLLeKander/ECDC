@@ -134,7 +134,6 @@ class EpisodicControlAgent(object):
         for action,reward,obs_pre,meta in reversed(self.history):
             return_ += reward
             self.action_buffers[action].update_drift(obs_pre, return_, meta)
-            pass
 
         for action_buffer in self.action_buffers:
             action_buffer.enforce_drift()

@@ -209,14 +209,14 @@ if __name__ == '__main__':
                     wrapup_time = 0
 
                     eval_process.env.seed(seed)
-                    act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+                    act_time, (return_, ep_frames) = timeF(eval_process.act_episode)
                     log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, seed)
 
                     if args.multi_eval:
                         eval_process.env.seed(seed)
                         old_eps = eval_process.agent.eps
                         eval_process.agent.eps = -1
-                        act_time, (return_, ep_frames) = timeF(agent_process.act_episode)
+                        act_time, (return_, ep_frames) = timeF(eval_process.act_episode)
                         log_episode(eval_file, buffers, eval_num, stopwatch.time(), return_, ep_frames, total_frame_count, act_time, wrapup_time, -seed)
 
                         eval_process.agent.eps = old_eps
