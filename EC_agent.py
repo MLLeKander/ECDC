@@ -110,7 +110,7 @@ def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
 
     env.close()
 
-    reg_ctor = LocalConstantReg if args.regressor_type == 'constant' else LocalLinearReg
+    reg_ctor = LocalConstantReg if args.regressor_type in ['constant', 'kernel'] else LocalLinearReg
     return [reg_ctor(k, forest) for forest in forests], obs_projection
     
 class EpisodicControlAgent(object):
