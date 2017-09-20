@@ -51,7 +51,7 @@ class AgentProcess(object):
         do_render = os.path.isfile('/tmp/gymrender')
 
         while True:
-            action = self.agent.choose_action(obs)
+            action, meta = self.agent.choose_action(obs)
             obs_pre = obs
 
             reward = 0
@@ -64,7 +64,7 @@ class AgentProcess(object):
                 if done:
                     break
 
-            self.agent.observe_action(action, reward, obs_pre, obs)
+            self.agent.observe_action(action, reward, obs_pre, obs, meta)
             return_ += reward
             if done:
                 return (return_, frames)
@@ -91,19 +91,22 @@ def get_eval_file():
     return open(os.path.join(args.log_dir, 'eval.csv'), 'w')
 
 def write_buff_files(agent_process):
-    def get_forest_data(forest):
-        datas, labels = [], []
+    def get_forest_data(forest, action_buffer):
+        datas, labels, drift_hists = [], [], []
         for i in range(forest.get_memory_size()):
             if forest.is_active(i):
                 datas.append(forest.get_data(i))
                 labels.append(forest.get_label(i))
-        return datas, labels
+                if action_buffer.drift_hist is not None:
+                    drift_hists.append(action_buffer.drift_hist[i,:])
+        return datas, labels, drift_hists
 
     all_data = {}
     for ndx, buf in enumerate(agent_process.agent.action_buffers):
-        datas, labels = get_forest_data(buf.forest)
+        datas, labels, drift_hists = get_forest_data(buf.forest, buf)
         all_data['data_%d'%ndx] = datas
         all_data['labels_%d'%ndx] = labels
+        all_data['driftHist_%d'%ndx] = drift_hists
     fname = os.path.join(args.log_dir, 'data.npz')
     np.savez_compressed(fname, **all_data)
 
@@ -111,7 +114,7 @@ def log_init(log_file, buffers):
     log_file.write('episode,totalBufferSize,totalFrameCount,walltime,return,epFrames,actTime,wrapupTime')
     for i in range(len(buffers)):
         log_file.write(',size%d'%i)
-    log_file.write(',seed\n')
+    log_file.write(',seed,evictions\n')
     log_file.flush()
 
 def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_frame_count, act_time, wrapup_time, seed):
@@ -122,6 +125,7 @@ def log_episode(log_file, buffers, episode_num, time, return_, ep_frames, total_
     outputs.extend([return_, ep_frames, act_time, wrapup_time])
     outputs.extend(buff_sizes)
     outputs.append(seed)
+    outputs.append(sum([buff.evict_count for buff in buffers]))
 
     log_file.write(','.join(map(str, outputs))+'\n')
     log_file.flush()
@@ -141,15 +145,16 @@ def monkeypatch_atari_greyscale():
             slf.observation_space = gym.spaces.Box(low=old_space.low[:,:,0], high=old_space.high[:,:,0])
     AtariEnv.__init__ = new_init
 
-    old_render = AtariEnv._render
-    def new_render(slf, mode='human', close=False):
-        if close or mode != 'human':
-            old_render(slf, mode, close)
-        if slf.viewer is None:
-            from gym.envs.classic_control import rendering
-            slf.viewer = rendering.SimpleImageViewer()
-        slf.viewer.imshow(slf._get_image()[:,:,np.newaxis].repeat(3,axis=2))
-    AtariEnv._render = new_render
+    if not args.headless:
+        old_render = AtariEnv._render
+        def new_render(slf, mode='human', close=False):
+            if close or mode != 'human':
+                old_render(slf, mode, close)
+            if slf.viewer is None:
+                from gym.envs.classic_control import rendering
+                slf.viewer = rendering.SimpleImageViewer()
+            slf.viewer.imshow(slf._get_image()[:,:,np.newaxis].repeat(3,axis=2))
+        AtariEnv._render = new_render
 
 if __name__ == '__main__':
     parse_args()

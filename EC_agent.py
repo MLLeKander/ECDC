@@ -126,12 +126,21 @@ class EpisodicControlAgent(object):
     def init_episode(self, obs):
         self.history = []
 
-    def observe_action(self, action, reward, obs_pre, obs_post):
-        self.history.append((action, reward, self.obs_projection(obs_pre)))
+    def observe_action(self, action, reward, obs_pre, obs_post, meta):
+        self.history.append((action, reward, self.obs_projection(obs_pre), meta))
 
     def wrapup_episode(self):
         return_ = 0
-        for action,reward,obs_pre in reversed(self.history):
+        for action,reward,obs_pre,meta in reversed(self.history):
+            return_ += reward
+            self.action_buffers[action].update_drift(obs_pre, return_, meta)
+            pass
+
+        for action_buffer in self.action_buffers:
+            action_buffer.enforce_drift()
+
+        return_ = 0
+        for action,reward,obs_pre,meta in reversed(self.history):
             return_ += reward
             self.action_buffers[action].add(obs_pre, return_)
 
@@ -140,10 +149,13 @@ class EpisodicControlAgent(object):
             return np.random.choice(self.num_actions)
 
         obs = self.obs_projection(obs)
-        estimates = np.array([buff.query(obs)[0] for buff in self.action_buffers])
+        queries = [buff.query(obs) for buff in self.action_buffers]
+        estimates = np.array([query[0] for query in queries])
+
         s = sum(estimates)
         if random.uniform(0,1) < self.eps or not np.isfinite(s):
-            #return random.randint(0,len(self.action_buffers)-1)
-            return np.random.choice(len(estimates))
-        #return np.random.choice(len(estimates), p=estimates/s)
-        return np.argmax(estimates)
+            return np.random.choice(len(estimates)), None
+
+        #action = np.random.choice(len(estimates), p=estimates/s)
+        action = np.argmax(estimates)
+        return action, queries[action][1]
