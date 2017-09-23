@@ -177,5 +177,6 @@ class LocalConstantReg(LocalReg):
 class LocalLinearReg(LocalReg):
     def _predict(self, X, weights, dists, labels, ndxes, data):
         w_sqrt = np.sqrt(weights)
-        fit = np.linalg.lstsq(X * w_sqrt[:,None], labels * w_sqrt)[0]
-        return fit.dot(X)
+        data_with_bias = np.insert(data, 0, 1, axis=1)
+        fit = np.linalg.lstsq(data_with_bias * w_sqrt[:,None], labels * w_sqrt)[0]
+        return fit.dot(np.insert(X, 0, 1))

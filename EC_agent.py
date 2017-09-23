@@ -37,11 +37,11 @@ class FlattenProjection(object):
         return in_vec.ravel()
 
 class RandomProjection(object):
-    def __init__(self, in_shape, out_dims):
+    def __init__(self, in_shape, out_dims, seed):
         if args.project_gauss:
-            self.projection = GaussianRandomProjection(n_components=out_dims)
+            self.projection = GaussianRandomProjection(n_components=out_dims, random_state=seed)
         else:
-            self.projection = SparseRandomProjection(n_components=out_dims)
+            self.projection = SparseRandomProjection(n_components=out_dims, random_state=seed)
         num_dims = np.prod(in_shape)
         self.projection.fit([[1]*num_dims])
         self._out_dims = out_dims
@@ -54,13 +54,13 @@ class RandomProjection(object):
         return self.projection.transform(in_vec.reshape(1,-1)).ravel()
 
 class RescaleProjection(object):
-    def __init__(self, in_shape, out_dims):
+    def __init__(self, in_shape, out_dims, seed):
         rand_in_shape = list(in_shape) # Temporarily convert to list to modify
         rand_in_shape[0] = args.rescale_width
         rand_in_shape[1] = args.rescale_height
         rand_in_shape = tuple(rand_in_shape)
 
-        self.rand_projection = RandomProjection(rand_in_shape, out_dims)
+        self.rand_projection = RandomProjection(rand_in_shape, out_dims, seed)
 
     def out_dims(self):
         return self.rand_projection.out_dims()
@@ -79,9 +79,9 @@ def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
                 if (args.rescale_height <= 0) != (args.rescale_width <= 0):
                     raise ValueError('Either both or neither of rescale_height and rescale_width must be specified')
                 elif args.rescale_height > 0:
-                    projection = RescaleProjection(in_shape=in_shape, out_dims=max_dims)
+                    projection = RescaleProjection(in_shape=in_shape, out_dims=max_dims, seed=seed)
                 else:
-                    projection = RandomProjection(in_shape=in_shape, out_dims=max_dims)
+                    projection = RandomProjection(in_shape=in_shape, out_dims=max_dims, seed=seed)
         elif isinstance(observation_space, gym.spaces.Discrete): #TODO: ?
             projection = FlattenProjection(in_shape=in_shape)
         else:
