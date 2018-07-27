@@ -7,17 +7,20 @@ import scipy.stats
 arg_parser.add_argument('--kernel', choices=kernels.keys(), default='constant')
 arg_parser.add_argument('--tree_consistency_iters', type=int, default=10)
 arg_parser.add_argument('--match_exact', type=str2bool, default=True)
+arg_parser.add_argument('--drift_exact', type=str2bool, default=False)
 arg_parser.add_argument('--drift_hist_len', type=int, default=-1)
 arg_parser.add_argument('--drift_thresh', type=float, default=-1)
 
 class LocalReg(object):
-    def __init__(self, k, nn_forest, kernel=None, tree_consistency_iters=None, match_exact=None, drift_hist_len=None, drift_thresh=None):
+    def __init__(self, k, nn_forest, kernel=None, tree_consistency_iters=None, match_exact=None, drift_exact=None, drift_hist_len=None, drift_thresh=None):
         if kernel is None:
             kernel = args.kernel
         if tree_consistency_iters is None:
             tree_consistency_iters = args.tree_consistency_iters
         if match_exact is None:
             match_exact = args.match_exact
+        if drift_exact is None:
+            drift_exact = args.drift_exact
         if drift_hist_len is None:
             drift_hist_len = args.drift_hist_len
         if drift_thresh is None:
@@ -29,6 +32,7 @@ class LocalReg(object):
         self.kernel = kernels[kernel] if isinstance(kernel, str) else kernel
         self.tree_consistency_iters = tree_consistency_iters
         self.match_exact = match_exact
+        self.drift_exact = drift_exact
         self.drift_hist_len = drift_hist_len
         self.drift_thresh = drift_thresh
 
@@ -94,7 +98,10 @@ class LocalReg(object):
         if self.match_exact:
             exact_ndx = self.forest.lookup_exact(X)
             if self.forest.is_valid_ndx(exact_ndx):
-                return (self.forest.get_label(exact_ndx), None)
+                if self.drift_exact:
+                    return (self.forest.get_label(exact_ndx), exact_ndx)
+                else:
+                    return (self.forest.get_label(exact_ndx), None)
         dists, labels, ndxes, data = self.forest.neighbors(X, self.k)
         if len(dists) == 0:
             return (np.nan, None)
@@ -132,7 +139,7 @@ class LocalReg(object):
             for ndx, rank in zip(ndxes, ranks):
                 self._drift_hist_add(ndx, rank)
         elif exact_ndx in ndxes:
-            exact_sub_ndx = nonzero(ndxes==exact_ndx)[0][0]
+            exact_sub_ndx = ndxes==exact_ndx
             self._drift_hist_add(exact_ndx, ranks[exact_sub_ndx])
         else:
             print 'exact_ndx not found in ndxes'
