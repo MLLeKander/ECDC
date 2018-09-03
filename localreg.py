@@ -10,9 +10,10 @@ arg_parser.add_argument('--match_exact', type=str2bool, default=True)
 arg_parser.add_argument('--drift_exact', type=str2bool, default=False)
 arg_parser.add_argument('--drift_hist_len', type=int, default=-1)
 arg_parser.add_argument('--drift_thresh', type=float, default=-1)
+arg_parser.add_argument('--drift_rev_errs', type=str2bool, default=False)
 
 class LocalReg(object):
-    def __init__(self, k, nn_forest, kernel=None, tree_consistency_iters=None, match_exact=None, drift_exact=None, drift_hist_len=None, drift_thresh=None):
+    def __init__(self, k, nn_forest, kernel=None, tree_consistency_iters=None, match_exact=None, drift_exact=None, drift_hist_len=None, drift_thresh=None, drift_rev_errs=None):
         if kernel is None:
             kernel = args.kernel
         if tree_consistency_iters is None:
@@ -25,6 +26,8 @@ class LocalReg(object):
             drift_hist_len = args.drift_hist_len
         if drift_thresh is None:
             drift_thresh = args.drift_thresh
+        if drift_rev_errs is None:
+            drift_rev_errs = args.drift_rev_errs
 
         self.k = k
         self.forest = nn_forest
@@ -35,12 +38,14 @@ class LocalReg(object):
         self.drift_exact = drift_exact
         self.drift_hist_len = drift_hist_len
         self.drift_thresh = drift_thresh
+        self.drift_rev_errs = drift_rev_errs
 
         #TODO: Type will need to be larger for higher k > 128
         if (self.drift_hist_len > 0) != (self.drift_thresh > 0):
             raise ValueError('Either both or neither of drift_hist_len and drift_thresh must be specified')
         elif self.drift_hist_len > 0:
             self.drift_hist = np.full((nn_forest.get_memory_size(), drift_hist_len), -1, dtype=np.int8)
+            #self.drift_hist = np.full((nn_forest.get_memory_size(), drift_hist_len), False, dtype=np.bool)
             self.active_ndxes = set()
         else:
             self.drift_hist = None
@@ -76,11 +81,13 @@ class LocalReg(object):
             return
         #TODO: This may not work for (near-)empty cases
         new_drift_hist = np.full((self.drift_hist_len,), 0, dtype=np.int8)
+        #new_drift_hist = np.full((self.drift_hist_len,), False, dtype=np.bool)
         if self.forest.get_memory_size() != del_ndx:
             new_drift_hist = self.drift_hist[del_ndx, :].copy()
             if del_ndx != old_tail_ndx:
                 self.drift_hist[del_ndx, :] = self.drift_hist[old_tail_ndx, :]
             self.drift_hist[old_tail_ndx, :] = -1
+            #self.drift_hist[old_tail_ndx, :] = False
         self.drift_hist[head_ndx] = new_drift_hist
 
     def _drift_hist_add(self, ndx, rank):
@@ -91,7 +98,7 @@ class LocalReg(object):
         tmp = np.roll(self.drift_hist[ndx,:],1)
         tmp[0] = rank
         self.drift_hist[ndx,:] = tmp
-        if rank < self.drift_thresh:
+        if tmp.mean() >= self.drift_thresh:
             self.active_ndxes.add(ndx)
 
     def query(self, X):
@@ -133,6 +140,8 @@ class LocalReg(object):
 
         hats = np.array(self._leave_one_out_predictions(X, weights, dists, labels, ndxes, data))
         hat_errs = np.abs(hats - target)
+        if self.drift_rev_errs:
+            hat_errs = -hat_errs
 
         ranks = scipy.stats.rankdata(hat_errs, method='min').astype(np.int8)
         if exact_ndx is None:
@@ -148,7 +157,7 @@ class LocalReg(object):
         if self.drift_hist is None:
             return
         for i in self.active_ndxes:
-            while self.drift_hist[i, :].mean() > self.drift_thresh:
+            while self.drift_hist[i, :].mean() >= self.drift_thresh:
                 self.evict_count += 1
                 self.clear(i)
         self.active_ndxes.clear()
@@ -172,12 +181,15 @@ class LocalConstantReg(LocalReg):
         return np.sum(weights*labels)/np.sum(weights)
 
     def _leave_one_out_predictions(self, X, weights, dists, labels, ndxes, data):
+        if len(weights) == 0:
+            return np.nan
+
         numerator = np.sum(weights*labels)
         denominator = np.sum(weights)
 
         hats = []
         for weight, label in zip(weights, labels):
-            hat = (numerator-weight*label)/(denominator-weight*label)
+            hat = (numerator-weight*label)/(denominator-weight)
             hats.append(hat)
         return hats
 
