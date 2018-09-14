@@ -7,19 +7,20 @@ from utils import StopWatch, timeF
 from Queue import Queue
 from EC_agent import EpisodicControlAgent, make_buffers
 
-arg_parser.add_argument('--max_episodes', type=int, default=1000000)
-arg_parser.add_argument('--max_frames', type=int, default=5000000)
-arg_parser.add_argument('--num_repeat', type=int, default=1)
-arg_parser.add_argument('--force_overwrite', type=str2bool, default=False)
-arg_parser.add_argument('--headless', type=str2bool, default=False)
-arg_parser.add_argument('--checkpoint_frame_spacing', type=int, default=-1)
-arg_parser.add_argument('--eval_frame_spacing', type=int, default=-1)
-arg_parser.add_argument('--eval_seeds', type=str2list(int), default=range(100,105))
-arg_parser.add_argument('--multi_eval', type=str2bool, default=False)
-arg_parser.add_argument('--seed', type=int, default=5)
-arg_parser.add_argument('--atari_greyscale','--atari_grayscale', type=str2bool, default=True)
-arg_parser.add_argument('env')
-arg_parser.add_argument('log_dir')
+arg_group = arg_parser.add_argument_group('env arguments')
+arg_group.add_argument('--max_episodes', type=int, default=1000000)
+arg_group.add_argument('--max_frames', type=int, default=5000000)
+arg_group.add_argument('--num_repeat', type=int, default=1)
+arg_group.add_argument('--force_overwrite', type=str2bool, default=False)
+arg_group.add_argument('--headless', type=str2bool, default=False)
+arg_group.add_argument('--checkpoint_frame_spacing', type=int, default=-1)
+arg_group.add_argument('--eval_frame_spacing', type=int, default=-1)
+arg_group.add_argument('--eval_seeds', type=str2list(int), default=range(100,105))
+arg_group.add_argument('--multi_eval', type=str2bool, default=False)
+arg_group.add_argument('--seed', type=int, default=5)
+arg_group.add_argument('--atari_greyscale','--atari_grayscale', type=str2bool, default=True)
+arg_group.add_argument('env')
+arg_group.add_argument('log_dir')
 
 class AgentProcess(object):
     def __init__(self, env_name, buffers, projection, seed, num_repeat):

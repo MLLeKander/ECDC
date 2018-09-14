@@ -4,31 +4,18 @@ import numpy as np
 from utils import PrettyDeque
 import scipy.stats
 
-arg_parser.add_argument('--kernel', choices=kernels.keys(), default='constant')
-arg_parser.add_argument('--tree_consistency_iters', type=int, default=10)
-arg_parser.add_argument('--match_exact', type=str2bool, default=True)
-arg_parser.add_argument('--drift_exact', type=str2bool, default=False)
-arg_parser.add_argument('--drift_hist_len', type=int, default=-1)
-arg_parser.add_argument('--drift_thresh', type=float, default=-1)
-arg_parser.add_argument('--drift_rev_errs', type=str2bool, default=False)
+arg_group = arg_parser.add_argument_group('regressor arguments')
+arg_group.add_argument('--kernel', choices=kernels.keys(), default='constant')
+arg_group.add_argument('--tree_consistency_iters', type=int, default=10)
+arg_group.add_argument('--match_exact', type=str2bool, default=True)
+arg_group.add_argument('--drift_exact', type=str2bool, default=False)
+arg_group.add_argument('--drift_hist_len', type=int, default=-1)
+arg_group.add_argument('--drift_thresh', type=float, default=-1)
+arg_group.add_argument('--drift_rev_errs', type=str2bool, default=False)
 
 class LocalReg(object):
-    def __init__(self, k, nn_forest, kernel=None, tree_consistency_iters=None, match_exact=None, drift_exact=None, drift_hist_len=None, drift_thresh=None, drift_rev_errs=None):
-        if kernel is None:
-            kernel = args.kernel
-        if tree_consistency_iters is None:
-            tree_consistency_iters = args.tree_consistency_iters
-        if match_exact is None:
-            match_exact = args.match_exact
-        if drift_exact is None:
-            drift_exact = args.drift_exact
-        if drift_hist_len is None:
-            drift_hist_len = args.drift_hist_len
-        if drift_thresh is None:
-            drift_thresh = args.drift_thresh
-        if drift_rev_errs is None:
-            drift_rev_errs = args.drift_rev_errs
-
+    @clidefault
+    def __init__(self, k, nn_forest, kernel=CLIArg, tree_consistency_iters=CLIArg, match_exact=CLIArg, drift_exact=CLIArg, drift_hist_len=CLIArg, drift_thresh=CLIArg, drift_rev_errs=CLIArg):
         self.k = k
         self.forest = nn_forest
 
@@ -62,6 +49,7 @@ class LocalReg(object):
         head_ndx = self.forest.get_head_ndx()
 
         self._drift_hist_new(old_tail_ndx, del_ndx, head_ndx)
+        #self.drift_strategy.add(X, label, old_tail_ndx, del_ndx, head_ndx)
 
         for i in range(self.tree_consistency_iters):
             self.forest.enforce_tree_consistency_random()
@@ -75,6 +63,8 @@ class LocalReg(object):
             if old_ndx != ndx:
                 self.drift_hist[ndx, :] = self.drift_hist[old_ndx, :]
             self.drift_hist[old_ndx, :] = np.full((self.drift_hist_len,), -1, dtype=np.int8)
+        #self.evict_count += 1
+        #return old_ndx
 
     def _drift_hist_new(self, old_tail_ndx, del_ndx, head_ndx):
         if self.drift_hist is None:
@@ -154,6 +144,7 @@ class LocalReg(object):
             print 'exact_ndx not found in ndxes'
 
     def enforce_drift(self):
+        #self.drift_strategy.enforce_drift()
         if self.drift_hist is None:
             return
         for i in self.active_ndxes:

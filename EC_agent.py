@@ -7,24 +7,27 @@ from localreg import LocalConstantReg, LocalLinearReg
 from vqtree import KForest
 from sklearn.random_projection import SparseRandomProjection, GaussianRandomProjection
 
-arg_parser.add_argument('--num_trees', type=int, default=1)
-arg_parser.add_argument('--memory_size', type=int, default=1000000)
-arg_parser.add_argument('--max_leaf_size', type=int, default=128)
-arg_parser.add_argument('--branch_factor', type=int, default=32)
-arg_parser.add_argument('--spill', type=float, default=-1)
-arg_parser.add_argument('--min_leaves', type=int, default=40)
-arg_parser.add_argument('--search_type', type=int, default=3)
-arg_parser.add_argument('--exact_eps', type=float, default=0.1)
+arg_group = arg_parser.add_argument_group('KNN arguments')
+arg_group.add_argument('--num_trees', type=int, default=1)
+arg_group.add_argument('--memory_size', type=int, default=1000000)
+arg_group.add_argument('--max_leaf_size', type=int, default=128)
+arg_group.add_argument('--branch_factor', type=int, default=32)
+arg_group.add_argument('--spill', type=float, default=-1)
+arg_group.add_argument('--min_leaves', type=int, default=40)
+arg_group.add_argument('--search_type', type=int, default=3)
+arg_group.add_argument('--exact_eps', type=float, default=0.1)
 
-arg_parser.add_argument('--project_gauss', type=str2bool, default=False)
-arg_parser.add_argument('--rescale_height', type=int, default=-1)
-arg_parser.add_argument('--rescale_width', type=int, default=-1)
+arg_group = arg_parser.add_argument_group('representation arguments')
+arg_group.add_argument('--project_gauss', type=str2bool, default=False)
+arg_group.add_argument('--rescale_height', type=int, default=-1)
+arg_group.add_argument('--rescale_width', type=int, default=-1)
+arg_group.add_argument('--max_dims', type=int, default=64)
 
-arg_parser.add_argument('--eps', type=float, default=0.005)
-arg_parser.add_argument('--max_dims', type=int, default=64)
-arg_parser.add_argument('--k', type=int, default=11)
-arg_parser.add_argument('--regressor_type', choices=['kernel','linear'], default='kernel')
-arg_parser.add_argument('--dry_run', type=str2bool, default=False)
+arg_group = arg_parser.add_argument_group('agent arguments')
+arg_group.add_argument('--eps', type=float, default=0.005)
+arg_group.add_argument('--k', type=int, default=11)
+arg_group.add_argument('--regressor_type', choices=['kernel','linear'], default='kernel')
+arg_group.add_argument('--dry_run', type=str2bool, default=False)
 
 class FlattenProjection(object):
     def __init__(self, in_shape):
@@ -69,7 +72,8 @@ class RescaleProjection(object):
         rescaled = cv2.resize(in_vec, (args.rescale_width, args.rescale_height), interpolation=cv2.INTER_LINEAR)
         return self.rand_projection(rescaled)
 
-def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
+@clidefault
+def make_buffers(env_name, k=CLIArg, regressor_type=CLIArg, max_dims=CLIArg, seed=5):
     def get_projection(observation_space, max_dims):
         in_shape = observation_space.shape
         if isinstance(observation_space, gym.spaces.Box):
@@ -91,13 +95,6 @@ def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
     env = gym.make(env_name)
     action_space, observation_space = env.action_space, env.observation_space
 
-    if k is None:
-        k = args.k
-    if regressor_type is None:
-        regressor_type = args.regressor_type
-    if max_dims is None:
-        max_dims = args.max_dims
-
     obs_projection = get_projection(observation_space, max_dims)
 
     if not isinstance(action_space, gym.spaces.Discrete):
@@ -114,10 +111,8 @@ def make_buffers(env_name, k=None, regressor_type=None, max_dims=None, seed=5):
     return [reg_ctor(k, forest) for forest in forests], obs_projection
     
 class EpisodicControlAgent(object):
-    def __init__(self, action_buffers, obs_projection, eps=None):
-        if eps is None:
-            eps = args.eps
-
+    @clidefault
+    def __init__(self, action_buffers, obs_projection, eps=CLIArg):
         self.action_buffers = action_buffers
         self.obs_projection = obs_projection
         self.num_actions = len(action_buffers)
