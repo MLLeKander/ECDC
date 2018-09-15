@@ -98,7 +98,7 @@ def write_buff_files(agent_process):
             if forest.is_active(i):
                 datas.append(forest.get_data(i))
                 labels.append(forest.get_label(i))
-                if action_buffer.drift_hist is not None:
+                if action_buffer.drift_strategy.drift_hist is not None:
                     drift_hists.append(action_buffer.drift_hist[i,:])
         return datas, labels, drift_hists
 

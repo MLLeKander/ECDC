@@ -40,7 +40,7 @@ def clidefault(func):
     def wrapper_clidefault(*posargs, **kwargs):
         if argspec.defaults is not None:
             #TODO: Error messages could be better here (ie when posargs is too short)
-            for i in range(-1, -(len(argspec.args)-len(posargs))-1, -1):
+            for i in range(-1, -min(len(argspec.args)-len(posargs),len(argspec.defaults))-1, -1):
             #for i in range(-1, -len(argspec.defaults)-1, -1):
                 default = argspec.defaults[i]
                 arg = argspec.args[i]

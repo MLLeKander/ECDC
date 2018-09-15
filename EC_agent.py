@@ -128,7 +128,9 @@ class EpisodicControlAgent(object):
         return_ = 0
         for action,reward,obs_pre,meta in reversed(self.history):
             return_ += reward
-            self.action_buffers[action].update_drift(obs_pre, return_, meta)
+            exact = self.action_buffers[action].query_exact(obs_pre)
+            target = max(exact, return_) if exact is not None else return_
+            self.action_buffers[action].update_drift(obs_pre, target, meta)
 
         for action_buffer in self.action_buffers:
             action_buffer.enforce_drift()
@@ -136,7 +138,9 @@ class EpisodicControlAgent(object):
         return_ = 0
         for action,reward,obs_pre,meta in reversed(self.history):
             return_ += reward
-            self.action_buffers[action].add(obs_pre, return_)
+            exact = self.action_buffers[action].query_exact(obs_pre)
+            target = max(exact, return_) if exact is not None else return_
+            self.action_buffers[action].add(obs_pre, target)
 
     def choose_action(self, obs):
         if args.dry_run:
