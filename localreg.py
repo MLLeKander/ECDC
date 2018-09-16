@@ -3,7 +3,6 @@ from kernel import kernels
 from args import *
 import numpy as np
 from utils import PrettyDeque
-import scipy.stats
 
 arg_group = arg_parser.add_argument_group('regressor arguments')
 arg_group.add_argument('--kernel', choices=kernels.keys(), default='constant')

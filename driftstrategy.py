@@ -1,5 +1,6 @@
 from args import *
 import numpy as np
+import scipy.stats
 
 def default_drift_strategy(local_reg):
     return strategies[args.drift_strategy](local_reg)
@@ -157,13 +158,13 @@ class LOO_Rank(LeaveOneOut):
         return np.full((length, self.drift_hist_len), -1, dtype=np.int8)
 
     def _loo_stats(self, yhat_err, ytilde_errs):
-        return scipy.stats.rankdata(-hat_errs, method='min').astype(np.int8)
+        return scipy.stats.rankdata(-ytilde_errs, method='min').astype(np.int8)
 
 strategies = {
     'none': NoDrift,
     'random': RandomEvict,
     'loobinary': LOO_Binary,
-    'loorank': LOO_Binary,
+    'loorank': LOO_Rank,
 }
 
 arg_group = arg_parser.add_argument_group('drift arguments')
