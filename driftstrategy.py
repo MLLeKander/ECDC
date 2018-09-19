@@ -160,11 +160,45 @@ class LOO_Rank(LeaveOneOut):
     def _loo_stats(self, yhat_err, ytilde_errs):
         return scipy.stats.rankdata(-ytilde_errs, method='min').astype(np.int8)
 
+class LOO_Rank_Bad(LeaveOneOut):
+    @clidefault
+    def __init__(self, local_reg, drift_bad_errrank=CLIArg, drift_bad_activesign=CLIArg, **kwargs):
+        super(LOO_Rank_Bad, self).__init__(local_reg, **kwargs)
+        self.drift_bad_errrank = drift_bad_errrank
+        self.drift_bad_activesign = drift_bad_activesign
+
+    def _drift_hist_init(self, length=1):
+        return np.full((length, self.drift_hist_len), 0, dtype=np.int8)
+
+    def _loo_stats(self, yhat_err, ytilde_errs):
+        if self.drift_bad_errrank:
+            return scipy.stats.rankdata(ytilde_errs, method='min').astype(np.int8)
+        else:
+            return scipy.stats.rankdata(-ytilde_errs, method='min').astype(np.int8)
+
+    def _update_drift(self, X, target, weights, dists, labels, ndxes, data, prediction, exact_ndx):
+        yhat_err = np.abs(target-prediction)
+        ytildes = np.array(self.local_reg._leave_one_out_predictions(X, weights, dists, labels, ndxes, data))
+        ytilde_errs = np.abs(target-ytildes)
+        loo_stats = self._loo_stats(yhat_err, ytilde_errs)
+
+        if exact_ndx is not None and exact_ndx not in ndxes:
+            print 'exact_ndx not found in ndxes'
+        else:
+            for ndx, stat in zip(ndxes, loo_stats):
+                if exact_ndx is None or ndx == exact_ndx:
+                    self._drift_hist_add(ndx, stat)
+                    if self.drift_bad_activesign and stat < self.drift_thresh:
+                        self.active_ndxes.add(ndx)
+                    elif not self.drift_bad_activesign and stat >= self.drift_thresh:
+                        self.active_ndxes.add(ndx)
+
 strategies = {
     'none': NoDrift,
     'random': RandomEvict,
     'loobinary': LOO_Binary,
     'loorank': LOO_Rank,
+    'loorankbad': LOO_Rank_Bad,
 }
 
 arg_group = arg_parser.add_argument_group('drift arguments')
@@ -173,3 +207,5 @@ arg_group.add_argument('--drift_exact', type=str2bool, default=False)
 arg_group.add_argument('--drift_random', type=float, default=1)
 arg_group.add_argument('--drift_hist_len', type=int, default=10)
 arg_group.add_argument('--drift_thresh', type=float, default=0)
+arg_group.add_argument('--drift_bad_errrank', type=str2bool, default=True)
+arg_group.add_argument('--drift_bad_activesign', type=str2bool, default=True)
